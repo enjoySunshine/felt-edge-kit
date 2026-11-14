@@ -12,6 +12,7 @@ module.exports = {
 
     CircleToCircle: require('./CircleToCircle'),
     CircleToRectangle: require('./CircleToRectangle'),
+    CircleToRotatedRectangle: require('./CircleToRotatedRectangle'),
     GetCircleToCircle: require('./GetCircleToCircle'),
     GetCircleToRectangle: require('./GetCircleToRectangle'),
     GetLineToCircle: require('./GetLineToCircle'),
@@ -23,6 +24,7 @@ module.exports = {
     GetRectangleIntersection: require('./GetRectangleIntersection'),
     GetRectangleToRectangle: require('./GetRectangleToRectangle'),
     GetRectangleToTriangle: require('./GetRectangleToTriangle'),
+    GetRotatedRectangleCorners: require('./GetRotatedRectangleCorners'),
     GetTriangleToCircle: require('./GetTriangleToCircle'),
     GetTriangleToLine: require('./GetTriangleToLine'),
     GetTriangleToTriangle: require('./GetTriangleToTriangle'),
@@ -31,6 +33,7 @@ module.exports = {
     LineToRectangle: require('./LineToRectangle'),
     PointToLine: require('./PointToLine'),
     PointToLineSegment: require('./PointToLineSegment'),
+    PushCircleOutOfRotatedRectangle: require('./PushCircleOutOfRotatedRectangle'),
     RectangleToRectangle: require('./RectangleToRectangle'),
     RectangleToTriangle: require('./RectangleToTriangle'),
     RectangleToValues: require('./RectangleToValues'),

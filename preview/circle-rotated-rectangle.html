@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>圆片推出旋转牌面 · 预览</title>
+<style>
+    body { margin: 24px; background: #1d2027; color: #dfe3ea; font-family: sans-serif; }
+    h1 { font-size: 18px; font-weight: normal; }
+    p.legend { font-size: 13px; color: #9aa3b2; }
+    canvas { background: #262a33; border-radius: 8px; }
+</style>
+</head>
+<body>
+<h1>筹码推出旋转牌面 —— 牌不动，只把筹码推出牌面</h1>
+<p class="legend">
+    蓝色 = 牌（不动） · 灰虚线 = 筹码起始位置 · 绿虚线 = 推出后的位置 · 筹码红色 = 仍压住牌，绿色 = 已离开牌面
+</p>
+<canvas id="view" width="800" height="600"></canvas>
+<p class="legend" id="src"></p>
+
+<script>
+//  极简 CommonJS 垫片，让浏览器直接加载 src/ 下的源码文件，
+//  保证预览跑的就是被测试覆盖的同一份实现。
+window.__Vector2 = function (x, y) { this.x = x || 0; this.y = y || 0; };
+window.__Vector2.prototype.set = function (x, y) { this.x = x; this.y = y; return this; };
+
+window.module = { exports: {} };
+window.require = function (path)
+{
+    if (path.indexOf('Vector2') !== -1) { return window.__Vector2; }
+
+    throw new Error('未知模块: ' + path);
+};
+</script>
+<script src="../src/geom/intersects/GetRotatedRectangleCorners.js"></script>
+<script>
+window.GetRotatedRectangleCorners = window.module.exports;
+window.module = { exports: {} };
+</script>
+<script src="../src/geom/intersects/CircleToRotatedRectangle.js"></script>
+<script>
+window.CircleToRotatedRectangle = window.module.exports;
+window.module = { exports: {} };
+</script>
+<script src="../src/geom/intersects/PushCircleOutOfRotatedRectangle.js"></script>
+<script>
+window.PushCircleOutOfRotatedRectangle = window.module.exports;
+window.module = { exports: {} };
+</script>
+
+<script>
+(function ()
+{
+    var GetRotatedRectangleCorners = window.GetRotatedRectangleCorners;
+    var CircleToRotatedRectangle = window.CircleToRotatedRectangle;
+    var PushCircleOutOfRotatedRectangle = window.PushCircleOutOfRotatedRectangle;
+
+    var DEG = Math.PI / 180;
+
+    //  与测试用例一致的四组场景
+    var scenes = [
+        {
+            title: '牌心 (100, 100) · 40×20 · 0°',
+            card: { x: 100, y: 100, width: 40, height: 20, rotation: 0 },
+            chips: [
+                { x: 125, y: 100, radius: 10 },
+                { x: 140, y: 100, radius: 10, note: '碰不到牌，停在原地' }
+            ]
+        },
+        {
+            title: '牌心 (100, 100) · 40×20 · 90°',
+            card: { x: 100, y: 100, width: 40, height: 20, rotation: 90 * DEG },
+            chips: [
+                { x: 100, y: 130, radius: 15 }
+            ]
+        },
+        {
+            title: '牌心 (0, 0) · 40×20 · 45°',
+            card: { x: 0, y: 0, width: 40, height: 20, rotation: 45 * DEG },
+            chips: [
+                { x: 22, y: 8, radius: 6 },
+                { x: 2, y: 1, radius: 4, note: '圆心在牌里' }
+            ]
+        },
+        {
+            title: '牌心 (0, 0) · 40×20 · 30°（压的是角）',
+            card: { x: 0, y: 0, width: 40, height: 20, rotation: 30 * DEG },
+            chips: [
+                { x: 13.785, y: 24.124, radius: 8 }
+            ]
+        }
+    ];
+
+    //  用同一份实现算出每枚筹码被推出的终点
+    scenes.forEach(function (scene)
+    {
+        scene.corners = GetRotatedRectangleCorners(scene.card);
+
+        scene.chips.forEach(function (chip)
+        {
+            var pushed = PushCircleOutOfRotatedRectangle({ x: chip.x, y: chip.y, radius: chip.radius }, scene.card);
+
+            chip.endX = pushed.x;
+            chip.endY = pushed.y;
+            chip.moves = (Math.abs(chip.endX - chip.x) + Math.abs(chip.endY - chip.y)) > 1e-9;
+        });
+    });
+
+    var canvas = document.getElementById('view');
+    var ctx = canvas.getContext('2d');
+
+    var dpr = window.devicePixelRatio || 1;
+    var cssWidth = canvas.width;
+    var cssHeight = canvas.height;
+
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+    canvas.style.width = cssWidth + 'px';
+    canvas.style.height = cssHeight + 'px';
+
+    var COLS = 2;
+    var panelW = cssWidth / COLS;
+    var panelH = 300;
+    var headerH = 34;
+
+    function fmt (n)
+    {
+        return (Math.round(n * 1000) / 1000).toString();
+    }
+
+    //  为每个场景计算把内容装进面板的缩放与平移
+    function fitTransform (scene)
+    {
+        var minX = Infinity;
+        var minY = Infinity;
+        var maxX = -Infinity;
+        var maxY = -Infinity;
+
+        function grow (x, y, pad)
+        {
+            minX = Math.min(minX, x - pad);
+            minY = Math.min(minY, y - pad);
+            maxX = Math.max(maxX, x + pad);
+            maxY = Math.max(maxY, y + pad);
+        }
+
+        scene.corners.forEach(function (c) { grow(c.x, c.y, 0); });
+
+        scene.chips.forEach(function (chip)
+        {
+            grow(chip.x, chip.y, chip.radius);
+            grow(chip.endX, chip.endY, chip.radius);
+        });
+
+        var pad = 26;
+        var scale = Math.min(
+            (panelW - pad * 2) / (maxX - minX),
+            (panelH - headerH - pad * 2) / (maxY - minY)
+        );
+
+        return {
+            scale: scale,
+            ox: pad + ((panelW - pad * 2) - (maxX - minX) * scale) / 2 - minX * scale,
+            oy: headerH + pad + ((panelH - headerH - pad * 2) - (maxY - minY) * scale) / 2 - minY * scale
+        };
+    }
+
+    function circle (x, y, r)
+    {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+    }
+
+    function drawScene (scene, index, time)
+    {
+        var px = (index % COLS) * panelW;
+        var py = Math.floor(index / COLS) * panelH;
+
+        ctx.save();
+        ctx.translate(px, py);
+
+        ctx.strokeStyle = '#3a4050';
+        ctx.strokeRect(0.5, 0.5, panelW - 1, panelH - 1);
+
+        ctx.fillStyle = '#dfe3ea';
+        ctx.font = '13px sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.fillText(scene.title, 12, 10);
+
+        var t = fitTransform(scene);
+
+        ctx.translate(t.ox, t.oy);
+        ctx.scale(t.scale, t.scale);
+
+        //  牌（不旋转画布，直接画旋转后的四个角，牌始终不动）
+        ctx.beginPath();
+        ctx.moveTo(scene.corners[0].x, scene.corners[0].y);
+
+        for (var i = 1; i < 4; i++)
+        {
+            ctx.lineTo(scene.corners[i].x, scene.corners[i].y);
+        }
+
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(86, 140, 255, 0.25)';
+        ctx.fill();
+        ctx.lineWidth = 1.2 / t.scale;
+        ctx.strokeStyle = '#6f9bff';
+        ctx.stroke();
+
+        //  牌心
+        ctx.fillStyle = '#6f9bff';
+        ctx.beginPath();
+        ctx.arc(scene.card.x, scene.card.y, 1.6 / t.scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        //  动画：0~45% 推出，45~80% 停在最外，80~100% 回到起点
+        var phase = (time / 2200) % 1;
+        var k;
+
+        if (phase < 0.45)
+        {
+            k = phase / 0.45;
+            k = 1 - Math.pow(1 - k, 3);
+        }
+        else if (phase < 0.8)
+        {
+            k = 1;
+        }
+        else
+        {
+            k = 0;
+        }
+
+        scene.chips.forEach(function (chip, ci)
+        {
+            var cx = chip.x + (chip.endX - chip.x) * k;
+            var cy = chip.y + (chip.endY - chip.y) * k;
+
+            //  起始位置（灰虚线）
+            ctx.setLineDash([ 4 / t.scale, 4 / t.scale ]);
+            ctx.lineWidth = 1 / t.scale;
+            ctx.strokeStyle = '#8a93a5';
+            circle(chip.x, chip.y, chip.radius);
+            ctx.stroke();
+
+            //  推出后的位置（绿虚线）
+            if (chip.moves)
+            {
+                ctx.strokeStyle = '#3fbf7f';
+                circle(chip.endX, chip.endY, chip.radius);
+                ctx.stroke();
+
+                //  起点到终点的轨迹线
+                ctx.beginPath();
+                ctx.moveTo(chip.x, chip.y);
+                ctx.lineTo(chip.endX, chip.endY);
+                ctx.stroke();
+            }
+
+            ctx.setLineDash([]);
+
+            //  活动的筹码：还压着牌为红，离开牌面为绿。
+            //  相切不算压住：把半径缩小一丝再测，仍相交才是真的压住。
+            var pressing = CircleToRotatedRectangle({ x: cx, y: cy, radius: chip.radius - 0.02 }, scene.card);
+
+            circle(cx, cy, chip.radius);
+            ctx.fillStyle = pressing ? 'rgba(255, 99, 99, 0.55)' : 'rgba(63, 191, 127, 0.55)';
+            ctx.fill();
+            ctx.lineWidth = 1.4 / t.scale;
+            ctx.strokeStyle = pressing ? '#ff6363' : '#3fbf7f';
+            ctx.stroke();
+
+            //  坐标标注（画在面板坐标系里，避免文字被缩放）
+            ctx.save();
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            var sx = px + t.ox + cx * t.scale;
+            var sy = py + t.oy + cy * t.scale;
+
+            ctx.fillStyle = '#c9d1e0';
+            ctx.font = '11px sans-serif';
+
+            var label = '(' + fmt(chip.x) + ', ' + fmt(chip.y) + ') r' + chip.radius;
+
+            if (chip.moves)
+            {
+                label += ' → (' + fmt(chip.endX) + ', ' + fmt(chip.endY) + ')';
+            }
+            else
+            {
+                label += ' 不动';
+            }
+
+            if (chip.note)
+            {
+                label += ' · ' + chip.note;
+            }
+
+            ctx.fillText(label, px + 12, py + panelH - 34 + ci * 14);
+
+            //  圆心小点
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        });
+
+        ctx.restore();
+    }
+
+    function frame (time)
+    {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+        scenes.forEach(function (scene, index)
+        {
+            drawScene(scene, index, time);
+        });
+
+        requestAnimationFrame(frame);
+    }
+
+    document.getElementById('src').textContent =
+        '实现：src/geom/intersects/PushCircleOutOfRotatedRectangle.js · CircleToRotatedRectangle.js · GetRotatedRectangleCorners.js';
+
+    requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

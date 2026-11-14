@@ -79723,6 +79723,20 @@ declare namespace Phaser {
             function CircleToRectangle(circle: Phaser.Geom.Circle, rect: Phaser.Geom.Rectangle): boolean;
 
             /**
+             * Checks for intersection between a circle and a rotated rectangle.
+             *
+             * The rectangle is described by its center, size and rotation in radians.
+             * Positive rotation turns the rectangle clockwise, matching the rotation of
+             * Game Objects.
+             *
+             * A circle touching the rectangle is considered to be intersecting it.
+             * @param circle The circle to be checked.
+             * @param rect The rotated rectangle to be checked.
+             * @returns `true` if the two objects intersect, otherwise `false`.
+             */
+            function CircleToRotatedRectangle(circle: Phaser.Geom.Circle, rect: Phaser.Types.Geom.RotatedRectangle): boolean;
+
+            /**
              * Checks if two Circles intersect and returns the intersection points as a Point object array.
              * @param circleA The first Circle to check for intersection.
              * @param circleB The second Circle to check for intersection.
@@ -79870,6 +79884,22 @@ declare namespace Phaser {
             function GetRectangleToTriangle(rect: Phaser.Geom.Rectangle, triangle: Phaser.Geom.Triangle, out?: any[]): any[];
 
             /**
+             * Returns the four corners of a rotated rectangle.
+             *
+             * The rectangle is described by its center, size and rotation in radians.
+             * Positive rotation turns the rectangle clockwise, matching the rotation of
+             * Game Objects.
+             *
+             * The corners are returned in the order top-right, bottom-right, bottom-left,
+             * top-left, based on the unrotated rectangle. This order is preserved as the
+             * rectangle rotates.
+             * @param rect The rotated rectangle to get the corners of.
+             * @param out An optional array in which to store the corners. If not given, a new array is created. Existing entries are reused.
+             * @returns An array holding the four corners of the rotated rectangle.
+             */
+            function GetRotatedRectangleCorners(rect: Phaser.Types.Geom.RotatedRectangle, out?: Phaser.Math.Vector2[]): Phaser.Math.Vector2[];
+
+            /**
              * Checks if a Triangle and a Circle intersect, and returns the intersection points as a Point object array.
              * 
              * A Circle intersects a Triangle if its center is located within it or if any of the Triangle's sides intersect the Circle. As such, the Triangle and the Circle are considered "solid" for the intersection.
@@ -79956,6 +79986,26 @@ declare namespace Phaser {
              * @returns `true` if the Point is on the given line segment, otherwise `false`.
              */
             function PointToLineSegment(point: Phaser.Math.Vector2, line: Phaser.Geom.Line): boolean;
+
+            /**
+             * Pushes a circle out of a rotated rectangle.
+             *
+             * If the circle intersects the rectangle, the circle is moved along the
+             * shortest direction that frees it, until its outline no longer overlaps the
+             * rectangle. The rectangle itself never moves. After the push the circle
+             * touches the rectangle, either along an edge or on a corner, without
+             * overlapping it.
+             *
+             * If the circle does not intersect the rectangle, it is left unchanged.
+             *
+             * The rectangle is described by its center, size and rotation in radians.
+             * Positive rotation turns the rectangle clockwise, matching the rotation of
+             * Game Objects.
+             * @param circle The circle to push out of the rectangle. Its position is modified in place.
+             * @param rect The rotated rectangle to push the circle out of.
+             * @returns The circle that was passed in.
+             */
+            function PushCircleOutOfRotatedRectangle(circle: Phaser.Geom.Circle, rect: Phaser.Types.Geom.RotatedRectangle): Phaser.Geom.Circle;
 
             /**
              * Checks if two Rectangles intersect.
@@ -99677,6 +99727,32 @@ declare namespace Phaser {
         }
 
         namespace Geom {
+            /**
+             * A rotated rectangle, described by its center, size and rotation.
+             */
+            type RotatedRectangle = {
+                /**
+                 * The x coordinate of the center of the rectangle.
+                 */
+                x: number;
+                /**
+                 * The y coordinate of the center of the rectangle.
+                 */
+                y: number;
+                /**
+                 * The width of the rectangle, before rotation.
+                 */
+                width: number;
+                /**
+                 * The height of the rectangle, before rotation.
+                 */
+                height: number;
+                /**
+                 * The rotation of the rectangle around its center, in radians. Positive values rotate the rectangle clockwise, matching the rotation of Game Objects.
+                 */
+                rotation: number;
+            };
+
         }
 
         namespace Input {
